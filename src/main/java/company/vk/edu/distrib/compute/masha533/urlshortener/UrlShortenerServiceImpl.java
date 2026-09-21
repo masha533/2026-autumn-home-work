@@ -10,6 +10,7 @@ import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.NoSuchElementException;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -17,6 +18,7 @@ public class UrlShortenerServiceImpl implements UrlShortenerService {
     private final HttpServer server;
     private final int port;
     private final Dao<String> linksDao;
+    private final Dao<String> usersDao;
     private static final String ID_CHARS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 
     private boolean isValidLink(String link) {
@@ -27,6 +29,26 @@ public class UrlShortenerServiceImpl implements UrlShortenerService {
             }
             return "https".equals(uri.getScheme()) || "http".equals(uri.getScheme());
         } catch (URISyntaxException e) {
+            return false;
+        }
+    }
+
+    private boolean isAuthorized(HttpExchange exchange) {
+        try {
+            var authorization = exchange.getRequestHeaders().getFirst("Authorization");
+            if (authorization == null || !authorization.startsWith("Basic ")) {
+                return false;
+            }
+            var encoded = authorization.substring("Basic ".length());
+            var decoded = Base64.getDecoder().decode(encoded);
+            var body = new String(decoded, StandardCharsets.UTF_8);
+            var parts = body.split(":", 2);
+            if (parts.length != 2) {
+                return false;
+            }
+            final var savedPassword = usersDao.get(parts[0]);
+            return savedPassword.equals(parts[1]);
+        } catch (NoSuchElementException | IOException | IllegalArgumentException e) {
             return false;
         }
     }
@@ -117,6 +139,12 @@ public class UrlShortenerServiceImpl implements UrlShortenerService {
     }
 
     private void handleLinks(HttpExchange exchange) throws IOException {
+        if (!isAuthorized(exchange)) {
+            exchange.sendResponseHeaders(401, -1);
+            exchange.close();
+            return;
+        }
+
         final var method = exchange.getRequestMethod();
         if ("POST".equals(method)) {
             handleCreate(exchange);
@@ -155,13 +183,24 @@ public class UrlShortenerServiceImpl implements UrlShortenerService {
         }
     }
 
+    private void handleUsers(HttpExchange exchange) throws IOException {
+        final var body = new String(exchange.getRequestBody().readAllBytes());
+        var parts = body.split(":", 2);
+        usersDao.upsert(parts[0],parts[1]);
+        exchange.sendResponseHeaders(200, -1);
+        exchange.close();
+
+    }
+
     public UrlShortenerServiceImpl(int port) throws IOException {
         this.port = port;
         this.server = HttpServer.create(new InetSocketAddress(port), 0);
         this.linksDao = new UrlDao();
+        this.usersDao = new UrlDao();
         server.createContext("/v0/status", this::handleStatus);
         server.createContext("/v0/links", this::handleLinks);
         server.createContext("/", this::handleRedirect);
+        server.createContext("/internal/users", this::handleUsers);
     }
 
     private String getShortLinkId() {
