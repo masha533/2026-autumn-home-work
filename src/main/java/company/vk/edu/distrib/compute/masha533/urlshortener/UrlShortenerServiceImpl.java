@@ -21,6 +21,14 @@ public class UrlShortenerServiceImpl implements UrlShortenerService {
     private final Dao<String> linksDao;
     private final Dao<String> usersDao;
     private static final String ID_CHARS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    private static final String ID_PATTERN = "[A-Za-z0-9]{10}";
+    private static final String LINKS_PATH_PREFIX = "/v0/links/";
+    private static final String LINKS_PATH = "/v0/links";
+    private static final int PARTS_COUNT = 2;
+    private static final String POST_METHOD = "POST";
+    private static final String GET_METHOD = "GET";
+    private static final String PUT_METHOD = "PUT";
+    private static final String DELETE_METHOD = "DELETE";
 
     private boolean isValidLink(String link) {
         try {
@@ -43,8 +51,8 @@ public class UrlShortenerServiceImpl implements UrlShortenerService {
             var encoded = authorization.substring("Basic ".length());
             var decoded = Base64.getDecoder().decode(encoded);
             var body = new String(decoded, StandardCharsets.UTF_8);
-            var parts = body.split(":", 2);
-            if (parts.length != 2) {
+            var parts = body.split(":", PARTS_COUNT);
+            if (parts.length != PARTS_COUNT) {
                 return false;
             }
             final var savedPassword = usersDao.get(parts[0]);
@@ -75,9 +83,9 @@ public class UrlShortenerServiceImpl implements UrlShortenerService {
 
     private void handleGet(HttpExchange exchange) throws IOException {
         final var path = exchange.getRequestURI().getPath();
-        final var id = path.substring("/v0/links/".length());
+        final var id = path.substring(LINKS_PATH_PREFIX.length());
 
-        if (!id.matches("[A-Za-z0-9]{10}")) {
+        if (!id.matches(ID_PATTERN)) {
             exchange.sendResponseHeaders(422, -1);
             exchange.close();
             return;
@@ -98,8 +106,8 @@ public class UrlShortenerServiceImpl implements UrlShortenerService {
 
     private void handleUpdate(HttpExchange exchange) throws IOException {
         final var path = exchange.getRequestURI().getPath();
-        final var id = path.substring("/v0/links/".length());
-        if (!id.matches("[A-Za-z0-9]{10}")) {
+        final var id = path.substring(LINKS_PATH_PREFIX.length());
+        if (!id.matches(ID_PATTERN)) {
             exchange.sendResponseHeaders(422, -1);
             exchange.close();
             return;
@@ -123,8 +131,8 @@ public class UrlShortenerServiceImpl implements UrlShortenerService {
 
     private void handleDelete(HttpExchange exchange) throws IOException {
         final var path = exchange.getRequestURI().getPath();
-        final var id = path.substring("/v0/links/".length());
-        if (!id.matches("[A-Za-z0-9]{10}")) {
+        final var id = path.substring(LINKS_PATH_PREFIX.length());
+        if (!id.matches(ID_PATTERN)) {
             exchange.sendResponseHeaders(422, -1);
             exchange.close();
             return;
@@ -149,23 +157,27 @@ public class UrlShortenerServiceImpl implements UrlShortenerService {
 
         final var method = exchange.getRequestMethod();
         final var path = exchange.getRequestURI().getPath();
-        if ("POST".equals(method) && "/v0/links".equals(path)) {
-            handleCreate(exchange);
-        } else if ("GET".equals(method) && path.startsWith("/v0/links/")) {
-            handleGet(exchange);
-        } else if ("PUT".equals(method) && path.startsWith("/v0/links/")) {
-            handleUpdate(exchange);
-        } else if ("DELETE".equals(method) && path.startsWith("/v0/links/")) {
-            handleDelete(exchange);
+        if (POST_METHOD.equals(method)) {
+            if (LINKS_PATH.equals(path)) {
+                handleCreate(exchange);
+            }
+        } else if (path.startsWith(LINKS_PATH_PREFIX)) {
+            if (GET_METHOD.equals(method)) {
+                handleGet(exchange);
+            } else if (PUT_METHOD.equals(method)) {
+                handleUpdate(exchange);
+            } else if (DELETE_METHOD.equals(method)) {
+                handleDelete(exchange);
+            }
         }
     }
 
     private void handleRedirect(HttpExchange exchange) throws IOException {
         final var method = exchange.getRequestMethod();
-        if ("GET".equals(method)) {
+        if (GET_METHOD.equals(method)) {
             final var path = exchange.getRequestURI().getPath();
             final var id = path.substring("/".length());
-            if (!id.matches("[A-Za-z0-9]{10}")) {
+            if (!id.matches(ID_PATTERN)) {
                 exchange.sendResponseHeaders(422, -1);
                 exchange.close();
                 return;
@@ -188,10 +200,10 @@ public class UrlShortenerServiceImpl implements UrlShortenerService {
 
     private void handleUsers(HttpExchange exchange) throws IOException {
         final var method = exchange.getRequestMethod();
-        if ("POST".equals(method)) {
+        if (POST_METHOD.equals(method)) {
             final var body = new String(exchange.getRequestBody().readAllBytes());
-            var parts = body.split(":", 2);
-            if (parts.length == 2) {
+            var parts = body.split(":", PARTS_COUNT);
+            if (parts.length == PARTS_COUNT) {
                 usersDao.upsert(parts[0],parts[1]);
                 exchange.sendResponseHeaders(200, -1);
                 exchange.close();
@@ -212,7 +224,7 @@ public class UrlShortenerServiceImpl implements UrlShortenerService {
         this.linksDao = new PersistentDao(Path.of(System.getProperty("java.io.tmpdir"), "masha533-links.properties"));
         this.usersDao = new PersistentDao(Path.of(System.getProperty("java.io.tmpdir"), "masha533-users.properties"));
         server.createContext("/v0/status", this::handleStatus);
-        server.createContext("/v0/links", this::handleLinks);
+        server.createContext(LINKS_PATH, this::handleLinks);
         server.createContext("/", this::handleRedirect);
         server.createContext("/internal/users", this::handleUsers);
     }
