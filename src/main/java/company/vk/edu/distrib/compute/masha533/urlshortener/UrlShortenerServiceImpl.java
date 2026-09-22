@@ -10,6 +10,7 @@ import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.util.Base64;
 import java.util.NoSuchElementException;
 import java.util.concurrent.ThreadLocalRandom;
@@ -27,7 +28,7 @@ public class UrlShortenerServiceImpl implements UrlShortenerService {
             if (uri.getScheme() == null || uri.getHost() == null) {
                 return false;
             }
-            return "https".equals(uri.getScheme()) || "http".equals(uri.getScheme());
+            return "https".equalsIgnoreCase(uri.getScheme()) || "http".equalsIgnoreCase(uri.getScheme());
         } catch (URISyntaxException e) {
             return false;
         }
@@ -36,7 +37,7 @@ public class UrlShortenerServiceImpl implements UrlShortenerService {
     private boolean isAuthorized(HttpExchange exchange) {
         try {
             var authorization = exchange.getRequestHeaders().getFirst("Authorization");
-            if (authorization == null || !authorization.startsWith("Basic ")) {
+            if (authorization == null || !authorization.regionMatches(true, 0, "Basic ", 0, "Basic ".length())) {
                 return false;
             }
             var encoded = authorization.substring("Basic ".length());
@@ -140,19 +141,21 @@ public class UrlShortenerServiceImpl implements UrlShortenerService {
 
     private void handleLinks(HttpExchange exchange) throws IOException {
         if (!isAuthorized(exchange)) {
+            exchange.getResponseHeaders().set("WWW-Authenticate", "Basic realm=\"url-shortener\"");
             exchange.sendResponseHeaders(401, -1);
             exchange.close();
             return;
         }
 
         final var method = exchange.getRequestMethod();
-        if ("POST".equals(method)) {
+        final var path = exchange.getRequestURI().getPath();
+        if ("POST".equals(method) && "/v0/links".equals(path)) {
             handleCreate(exchange);
-        } else if ("GET".equals(method)) {
+        } else if ("GET".equals(method) && path.startsWith("/v0/links/")) {
             handleGet(exchange);
-        } else if ("PUT".equals(method)) {
+        } else if ("PUT".equals(method) && path.startsWith("/v0/links/")) {
             handleUpdate(exchange);
-        } else if ("DELETE".equals(method)) {
+        } else if ("DELETE".equals(method) && path.startsWith("/v0/links/")) {
             handleDelete(exchange);
         }
     }
@@ -184,19 +187,30 @@ public class UrlShortenerServiceImpl implements UrlShortenerService {
     }
 
     private void handleUsers(HttpExchange exchange) throws IOException {
-        final var body = new String(exchange.getRequestBody().readAllBytes());
-        var parts = body.split(":", 2);
-        usersDao.upsert(parts[0],parts[1]);
-        exchange.sendResponseHeaders(200, -1);
-        exchange.close();
+        final var method = exchange.getRequestMethod();
+        if ("POST".equals(method)) {
+            final var body = new String(exchange.getRequestBody().readAllBytes());
+            var parts = body.split(":", 2);
+            if (parts.length == 2) {
+                usersDao.upsert(parts[0],parts[1]);
+                exchange.sendResponseHeaders(200, -1);
+                exchange.close();
+            } else {
+                exchange.sendResponseHeaders(400, -1);
+                exchange.close();
+            }
+        } else {
+            exchange.sendResponseHeaders(404, -1);
+            exchange.close();
+        }
 
     }
 
     public UrlShortenerServiceImpl(int port) throws IOException {
         this.port = port;
         this.server = HttpServer.create(new InetSocketAddress(port), 0);
-        this.linksDao = new UrlDao();
-        this.usersDao = new UrlDao();
+        this.linksDao = new PersistentDao(Path.of(System.getProperty("java.io.tmpdir"), "masha533-links.properties"));
+        this.usersDao = new PersistentDao(Path.of(System.getProperty("java.io.tmpdir"), "masha533-users.properties"));
         server.createContext("/v0/status", this::handleStatus);
         server.createContext("/v0/links", this::handleLinks);
         server.createContext("/", this::handleRedirect);
