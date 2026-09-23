@@ -1,30 +1,16 @@
 package company.vk.edu.distrib.compute.test.urlshortener;
 
-import java.util.Collection;
-import java.util.List;
-import java.util.stream.Stream;
-
 import company.vk.edu.distrib.compute.AbstractHttpServiceFactory;
-import company.vk.edu.distrib.compute.urlshortener.DummyUrlShortenerServiceFactory;
-import company.vk.edu.distrib.compute.urlshortener.UrlShortenerService;
-import company.vk.edu.distrib.compute.masha533.urlshortener.UrlShortenerServiceFactory;
-import org.junit.jupiter.api.extension.ExtensionContext;
-import org.junit.jupiter.params.provider.Arguments;
+import company.vk.edu.distrib.compute.urlshortener.UrlShortenerTest;
 import org.junit.jupiter.params.provider.ArgumentsProvider;
-import org.junit.jupiter.params.support.ParameterDeclarations;
-import org.junit.platform.commons.util.ReflectionUtils;
 
-public class UrlShortenerServiceFactoryArgumentsProvider implements ArgumentsProvider {
+public class UrlShortenerServiceFactoryArgumentsProvider
+    extends AbstractArgumentsProvider implements ArgumentsProvider {
 
-    private final Collection<Class<? extends AbstractHttpServiceFactory<? extends UrlShortenerService>>> factories =
-        List.of(
-                UrlShortenerServiceFactory.class
+    public UrlShortenerServiceFactoryArgumentsProvider() {
+        super(
+            AbstractArgumentsProvider.findAnnotatedFactories(UrlShortenerTest.class),
+            AbstractHttpServiceFactory.class
         );
-
-    @Override
-    public Stream<? extends Arguments> provideArguments(ParameterDeclarations parameters, ExtensionContext context) {
-        return factories.stream()
-                .map(ReflectionUtils::newInstance)
-                .map(Arguments::of);
     }
 }
