@@ -19,6 +19,22 @@ public class PersistentDao implements Dao<String> {
     private static final byte UPSERT = 0;
     private static final byte DELETE = 1;
 
+    private void appendOperation(byte op, String key, String value) throws IOException {
+        try (var output = new DataOutputStream(
+            Files.newOutputStream(
+                file,
+                StandardOpenOption.CREATE,
+                StandardOpenOption.APPEND
+            )
+        )) {
+            output.writeByte(op);
+            output.writeUTF(key);
+            if (op == UPSERT) {
+                output.writeUTF(value);
+            }
+        }
+    }
+
     public PersistentDao(Path file) throws IOException {
         this.file = file;
         if (Files.exists(file)) {
@@ -54,32 +70,13 @@ public class PersistentDao implements Dao<String> {
 
     @Override
     public void upsert(String key, String value) throws IOException {
-        try (var output = new DataOutputStream(
-            Files.newOutputStream(
-                file,
-                StandardOpenOption.CREATE,
-                StandardOpenOption.APPEND
-            )
-        )) {
-            output.writeByte(UPSERT);
-            output.writeUTF(key);
-            output.writeUTF(value);
-        }
+        appendOperation(UPSERT, key, value);
         storage.put(key, value);
     }
 
     @Override
     public void delete(String key) throws IOException {
-        try (var output = new DataOutputStream(
-            Files.newOutputStream(
-                file,
-                StandardOpenOption.CREATE,
-                StandardOpenOption.APPEND
-            )
-        )) {
-            output.writeByte(DELETE);
-            output.writeUTF(key);
-        }
+        appendOperation(DELETE, key, null);
         storage.remove(key);
     }
 
