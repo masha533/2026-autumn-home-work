@@ -5,6 +5,7 @@ import java.net.http.HttpClient;
 import java.time.Duration;
 
 import company.vk.edu.distrib.compute.AbstractHttpServiceFactory;
+import company.vk.edu.distrib.compute.test.TestUtils;
 import company.vk.edu.distrib.compute.urlshortener.UrlShortenerService;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
@@ -15,8 +16,10 @@ import org.junit.jupiter.params.provider.ArgumentsSource;
 
 import static company.vk.edu.distrib.compute.test.TestUtils.TIMEOUT;
 import static company.vk.edu.distrib.compute.test.TestUtils.randomPort;
+import static company.vk.edu.distrib.compute.test.TestUtils.runHttpCtx;
 import static company.vk.edu.distrib.compute.test.TestUtils.status;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
@@ -43,7 +46,10 @@ class StartStopStatusTest {
         assertTimeoutPreemptively(TIMEOUT, () -> {
             int port = randomPort();
             serviceFactory.create(port);
-            assertThrows(IOException.class, () -> status(HTTP_CLIENT, port));
+            runHttpCtx(HTTP_CLIENT, port, () -> {
+                RuntimeException exception = assertThrows(RuntimeException.class, TestUtils::status);
+                assertInstanceOf(IOException.class, exception.getCause());
+            });
         });
     }
 
@@ -54,7 +60,7 @@ class StartStopStatusTest {
             var service = serviceFactory.create(port);
             try {
                 service.start();
-                assertEquals(200, status(HTTP_CLIENT, port));
+                runHttpCtx(HTTP_CLIENT, port, () -> assertEquals(200, status()));
             } finally {
                 service.stop();
             }
@@ -82,7 +88,10 @@ class StartStopStatusTest {
             var service = serviceFactory.create(port);
             service.start();
             service.stop();
-            assertThrows(IOException.class, () -> status(HTTP_CLIENT, port));
+            runHttpCtx(HTTP_CLIENT, port, () -> {
+                RuntimeException exception = assertThrows(RuntimeException.class, () -> status());
+                assertInstanceOf(IOException.class, exception.getCause());
+            });
         });
     }
 }

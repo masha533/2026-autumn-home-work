@@ -68,6 +68,10 @@ val integrationTestRuntimeOnly = configurations.getByName("integrationTestRuntim
 
 configurations["integrationTestRuntimeOnly"].extendsFrom(configurations.runtimeOnly.get(), configurations.testRuntimeOnly.get())
 
+dependencies {
+    add("integrationTestImplementation", "org.junit.platform:junit-platform-launcher")
+}
+
 
 tasks.test {
     maxHeapSize = "128m"
