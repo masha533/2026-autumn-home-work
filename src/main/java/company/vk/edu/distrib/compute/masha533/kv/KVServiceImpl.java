@@ -1,0 +1,107 @@
+package company.vk.edu.distrib.compute.masha533.kv;
+
+import com.sun.net.httpserver.HttpServer;
+import com.sun.net.httpserver.HttpExchange;
+import company.vk.edu.distrib.compute.Dao;
+import company.vk.edu.distrib.compute.kv.KVService;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.util.NoSuchElementException;
+import java.net.InetSocketAddress;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+public class KVServiceImpl implements KVService {
+    private final HttpServer server;
+    private final Dao<byte[]> dao;
+    private static final String GET_METHOD = "GET";
+    private static final String PUT_METHOD = "PUT";
+    private static final String DELETE_METHOD = "DELETE";
+    private static final int PARTS_COUNT = 2;
+    private final ExecutorService executor;
+
+    private void handleStatus(HttpExchange exchange) throws IOException {
+        exchange.sendResponseHeaders(200, -1);
+        exchange.close();
+    }
+
+    private void handleEntity(HttpExchange exchange) throws IOException {
+        final var method = exchange.getRequestMethod();
+        final var query = exchange.getRequestURI().getRawQuery();
+        if (query == null) {
+            exchange.sendResponseHeaders(400, -1);
+            exchange.close();
+            return;
+        }
+        String id = null;
+        var params = query.split("&");
+        for (String param : params) {
+            var parts = param.split("=", PARTS_COUNT);
+            if (parts.length == PARTS_COUNT && "id".equals(parts[0])) {
+                id = parts[1];
+                break;
+            }
+        }
+        if (id == null || id.isEmpty()) {
+            exchange.sendResponseHeaders(400, -1);
+            exchange.close();
+            return;
+        }
+        try {
+            id = URLDecoder.decode(id, StandardCharsets.UTF_8);
+        } catch (IllegalArgumentException e) {
+            exchange.sendResponseHeaders(400, -1);
+            exchange.close();
+            return;
+        }
+        if (GET_METHOD.equals(method)) {
+            try {
+                byte[] value = dao.get(id);
+                exchange.sendResponseHeaders(200, value.length);
+                exchange.getResponseBody().write(value);
+                exchange.close();
+            } catch (NoSuchElementException e) {
+                exchange.sendResponseHeaders(404, -1);
+                exchange.close();
+            }
+        } else if (PUT_METHOD.equals(method)) {
+            byte[] body = exchange.getRequestBody().readAllBytes();
+            dao.upsert(id, body);
+            exchange.sendResponseHeaders(201, -1);
+            exchange.close();
+        } else if (DELETE_METHOD.equals(method)) {
+            dao.delete(id);
+            exchange.sendResponseHeaders(202, -1);
+            exchange.close();
+        }
+    }
+
+    public KVServiceImpl(int port, Dao<byte[]> dao) throws IOException {
+        this.dao = dao;
+        this.server = HttpServer.create(new InetSocketAddress(port), 0);
+        server.createContext("/v0/status", this::handleStatus);
+        server.createContext("/v0/entity", this::handleEntity);
+        executor = Executors.newFixedThreadPool(
+                Runtime.getRuntime().availableProcessors()
+        );
+        server.setExecutor(executor);
+    }
+
+    @Override
+    public void start() {
+        server.start();
+    }
+
+    @Override
+    public void stop() {
+        server.stop(5);
+        executor.shutdown();
+        try {
+            dao.close();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+}
