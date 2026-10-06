@@ -8,10 +8,11 @@ import java.io.IOException;
 
 @RemoteDaoFactoryTest
 public class RemoteDaoFactoryImpl implements RemoteDaoFactory<String> {
+    private static final int PORT_COUNT = 1;
 
     @Override
     public Dao<String> create(int... ports) throws IOException {
-        if (ports.length != 1) {
+        if (ports.length != PORT_COUNT) {
             throw new IllegalArgumentException();
         }
         return new RemoteDao(ports[0]);

@@ -20,7 +20,26 @@ public class KVServiceImpl implements KVService {
     private static final String PUT_METHOD = "PUT";
     private static final String DELETE_METHOD = "DELETE";
     private static final int PARTS_COUNT = 2;
+    private static final String ID_PARAMETER = "id";
     private final ExecutorService executor;
+
+    private String extractId(String query) {
+        if (query == null) {
+            throw new IllegalArgumentException();
+        }
+        var params = query.split("&");
+        for (String param : params) {
+            var parts = param.split("=", PARTS_COUNT);
+            if (parts.length == PARTS_COUNT && ID_PARAMETER.equals(parts[0])) {
+                String id = URLDecoder.decode(parts[1], StandardCharsets.UTF_8);
+                if (id.isEmpty()) {
+                    throw new IllegalArgumentException();
+                }
+                return id;
+            }
+        }
+        throw new IllegalArgumentException();
+    }
 
     private void handleStatus(HttpExchange exchange) throws IOException {
         exchange.sendResponseHeaders(200, -1);
@@ -29,28 +48,9 @@ public class KVServiceImpl implements KVService {
 
     private void handleEntity(HttpExchange exchange) throws IOException {
         final var method = exchange.getRequestMethod();
-        final var query = exchange.getRequestURI().getRawQuery();
-        if (query == null) {
-            exchange.sendResponseHeaders(400, -1);
-            exchange.close();
-            return;
-        }
-        String id = null;
-        var params = query.split("&");
-        for (String param : params) {
-            var parts = param.split("=", PARTS_COUNT);
-            if (parts.length == PARTS_COUNT && "id".equals(parts[0])) {
-                id = parts[1];
-                break;
-            }
-        }
-        if (id == null || id.isEmpty()) {
-            exchange.sendResponseHeaders(400, -1);
-            exchange.close();
-            return;
-        }
+        final String id;
         try {
-            id = URLDecoder.decode(id, StandardCharsets.UTF_8);
+            id = extractId(exchange.getRequestURI().getRawQuery());
         } catch (IllegalArgumentException e) {
             exchange.sendResponseHeaders(400, -1);
             exchange.close();

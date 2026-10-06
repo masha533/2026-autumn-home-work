@@ -47,8 +47,10 @@ public class PersistentByteDao implements Dao<byte[]> {
 
                         if (op == UPSERT) {
                             int len = input.readInt();
-                            byte[] value = new byte[len];
-                            input.readFully(value);
+                            byte[] value = input.readNBytes(len);
+                            if (value.length != len) {
+                                break;
+                            }
                             storage.put(key, value);
                         } else if (op == DELETE) {
                             storage.remove(key);
