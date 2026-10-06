@@ -1,6 +1,7 @@
 package company.vk.edu.distrib.compute.test.urlshortener;
 
 import java.io.IOException;
+import java.net.BindException;
 import java.net.http.HttpClient;
 import java.net.http.HttpResponse;
 import java.util.Collection;
@@ -20,13 +21,13 @@ import company.vk.edu.distrib.compute.urlshortener.UrlShortenerService;
 import company.vk.edu.distrib.compute.urlshortener.UrlShortenerTest;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.junit.jupiter.params.Parameter;
 import org.junit.jupiter.params.ParameterizedClass;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.platform.commons.util.ReflectionUtils;
+import org.junitpioneer.jupiter.RetryingTest;
 
 import static company.vk.edu.distrib.compute.test.AbstractArgumentsProvider.findAnnotatedFactories;
 import static company.vk.edu.distrib.compute.test.TestUtils.CONTENT_TYPE_TEXT;
@@ -84,7 +85,7 @@ class RemoteDaoLinksTest {
         HTTP_CLIENT.close();
     }
 
-    @Test
+    @RetryingTest(onExceptions = {BindException.class}, maxAttempts = 10, suspendForMs = 500)
     void getAbsent() {
         assertTimeoutPreemptively(TIMEOUT, () -> {
             try {
@@ -101,7 +102,7 @@ class RemoteDaoLinksTest {
         });
     }
 
-    @Test
+    @RetryingTest(onExceptions = {BindException.class}, maxAttempts = 10, suspendForMs = 500)
     void createAndGet() {
         assertTimeoutPreemptively(TIMEOUT, () -> {
             try {
@@ -128,7 +129,7 @@ class RemoteDaoLinksTest {
         });
     }
 
-    @Test
+    @RetryingTest(onExceptions = {BindException.class}, maxAttempts = 10, suspendForMs = 500)
     void update() {
         assertTimeoutPreemptively(TIMEOUT, () -> {
             try {
@@ -151,7 +152,7 @@ class RemoteDaoLinksTest {
         });
     }
 
-    @Test
+    @RetryingTest(onExceptions = {BindException.class}, maxAttempts = 10, suspendForMs = 500)
     void updateAbsent() {
         assertTimeoutPreemptively(TIMEOUT, () -> {
             try {
@@ -167,7 +168,7 @@ class RemoteDaoLinksTest {
         });
     }
 
-    @Test
+    @RetryingTest(onExceptions = {BindException.class}, maxAttempts = 10, suspendForMs = 500)
     void delete() {
         assertTimeoutPreemptively(TIMEOUT, () -> {
             try {
@@ -187,7 +188,7 @@ class RemoteDaoLinksTest {
         });
     }
 
-    @Test
+    @RetryingTest(onExceptions = {BindException.class}, maxAttempts = 10, suspendForMs = 500)
     void deleteAbsent() {
         assertTimeoutPreemptively(TIMEOUT, () -> {
             try {
@@ -203,7 +204,7 @@ class RemoteDaoLinksTest {
         });
     }
 
-    @Test
+    @RetryingTest(onExceptions = {BindException.class}, maxAttempts = 10, suspendForMs = 500)
     void redirect() {
         assertTimeoutPreemptively(TIMEOUT, () -> {
             try {
@@ -223,7 +224,7 @@ class RemoteDaoLinksTest {
         });
     }
 
-    @Test
+    @RetryingTest(onExceptions = {BindException.class}, maxAttempts = 10, suspendForMs = 500)
     void redirectAbsent() {
         assertTimeoutPreemptively(TIMEOUT, () -> {
             try {

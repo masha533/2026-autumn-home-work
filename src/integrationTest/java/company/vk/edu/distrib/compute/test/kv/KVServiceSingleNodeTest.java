@@ -1,5 +1,6 @@
 package company.vk.edu.distrib.compute.test.kv;
 
+import java.net.BindException;
 import java.net.http.HttpClient;
 import java.net.http.HttpResponse;
 import java.util.concurrent.ThreadLocalRandom;
@@ -7,11 +8,11 @@ import java.util.concurrent.ThreadLocalRandom;
 import company.vk.edu.distrib.compute.AbstractHttpServiceFactory;
 import company.vk.edu.distrib.compute.kv.KVService;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.junit.jupiter.params.Parameter;
 import org.junit.jupiter.params.ParameterizedClass;
 import org.junit.jupiter.params.provider.ArgumentsSource;
+import org.junitpioneer.jupiter.RetryingTest;
 
 import static company.vk.edu.distrib.compute.test.TestUtils.TIMEOUT;
 import static company.vk.edu.distrib.compute.test.TestUtils.delete;
@@ -39,7 +40,7 @@ class KVServiceSingleNodeTest {
         HTTP_CLIENT.close();
     }
 
-    @Test
+    @RetryingTest(onExceptions = {BindException.class}, maxAttempts = 10, suspendForMs = 500)
     void emptyKey() {
         assertTimeoutPreemptively(TIMEOUT, () -> {
             int port = randomPort();
@@ -58,7 +59,7 @@ class KVServiceSingleNodeTest {
         });
     }
 
-    @Test
+    @RetryingTest(onExceptions = {BindException.class}, maxAttempts = 10, suspendForMs = 500)
     void badRequest() {
         assertTimeoutPreemptively(TIMEOUT, () -> {
             int port = randomPort();
@@ -72,7 +73,7 @@ class KVServiceSingleNodeTest {
         });
     }
 
-    @Test
+    @RetryingTest(onExceptions = {BindException.class}, maxAttempts = 10, suspendForMs = 500)
     void getAbsent() {
         assertTimeoutPreemptively(TIMEOUT, () -> {
             int port = randomPort();
@@ -86,7 +87,7 @@ class KVServiceSingleNodeTest {
         });
     }
 
-    @Test
+    @RetryingTest(onExceptions = {BindException.class}, maxAttempts = 10, suspendForMs = 500)
     void deleteAbsent() {
         assertTimeoutPreemptively(TIMEOUT, () -> {
             int port = randomPort();
@@ -100,7 +101,7 @@ class KVServiceSingleNodeTest {
         });
     }
 
-    @Test
+    @RetryingTest(onExceptions = {BindException.class}, maxAttempts = 10, suspendForMs = 500)
     void insert() {
         assertTimeoutPreemptively(TIMEOUT, () -> {
             int port = randomPort();
@@ -123,7 +124,7 @@ class KVServiceSingleNodeTest {
         });
     }
 
-    @Test
+    @RetryingTest(onExceptions = {BindException.class}, maxAttempts = 10, suspendForMs = 500)
     void insertEmpty() {
         assertTimeoutPreemptively(TIMEOUT, () -> {
             int port = randomPort();
@@ -147,7 +148,7 @@ class KVServiceSingleNodeTest {
         });
     }
 
-    @Test
+    @RetryingTest(onExceptions = {BindException.class}, maxAttempts = 10, suspendForMs = 500)
     void lifecycle2keys() {
         assertTimeoutPreemptively(TIMEOUT, () -> {
             int port = randomPort();
@@ -184,7 +185,7 @@ class KVServiceSingleNodeTest {
         });
     }
 
-    @Test
+    @RetryingTest(onExceptions = {BindException.class}, maxAttempts = 10, suspendForMs = 500)
     void upsert() {
         assertTimeoutPreemptively(TIMEOUT, () -> {
             int port = randomPort();
@@ -210,7 +211,7 @@ class KVServiceSingleNodeTest {
         });
     }
 
-    @Test
+    @RetryingTest(onExceptions = {BindException.class}, maxAttempts = 10, suspendForMs = 500)
     void upsertEmpty() {
         assertTimeoutPreemptively(TIMEOUT, () -> {
             int port = randomPort();
@@ -236,7 +237,7 @@ class KVServiceSingleNodeTest {
         });
     }
 
-    @Test
+    @RetryingTest(onExceptions = {BindException.class}, maxAttempts = 10, suspendForMs = 500)
     void deleteTest() {
         assertTimeoutPreemptively(TIMEOUT, () -> {
             int port = randomPort();

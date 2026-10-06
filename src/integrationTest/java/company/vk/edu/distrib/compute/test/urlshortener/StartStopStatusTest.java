@@ -1,6 +1,7 @@
 package company.vk.edu.distrib.compute.test.urlshortener;
 
 import java.io.IOException;
+import java.net.BindException;
 import java.net.http.HttpClient;
 import java.time.Duration;
 
@@ -8,11 +9,11 @@ import company.vk.edu.distrib.compute.AbstractHttpServiceFactory;
 import company.vk.edu.distrib.compute.test.TestUtils;
 import company.vk.edu.distrib.compute.urlshortener.UrlShortenerService;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.junit.jupiter.params.Parameter;
 import org.junit.jupiter.params.ParameterizedClass;
 import org.junit.jupiter.params.provider.ArgumentsSource;
+import org.junitpioneer.jupiter.RetryingTest;
 
 import static company.vk.edu.distrib.compute.test.TestUtils.TIMEOUT;
 import static company.vk.edu.distrib.compute.test.TestUtils.randomPort;
@@ -29,7 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
  */
 @ParameterizedClass(allowZeroInvocations = true)
 @ArgumentsSource(UrlShortenerServiceFactoryArgumentsProvider.class)
-@EnabledIfEnvironmentVariable(named = "CURRENT_DATE", matches = "2026-09-\\d\\d")
+@EnabledIfEnvironmentVariable(named = "CURRENT_DATE", matches = "2026-(09-28|09-29|09-30|10-01|10-02|10-03|10-04|10-05|10-06)")
 class StartStopStatusTest {
     private static final HttpClient HTTP_CLIENT = HttpClient.newHttpClient();
 
@@ -41,7 +42,7 @@ class StartStopStatusTest {
         HTTP_CLIENT.close();
     }
 
-    @Test
+    @RetryingTest(onExceptions = {BindException.class}, maxAttempts = 10, suspendForMs = 500)
     void create() {
         assertTimeoutPreemptively(TIMEOUT, () -> {
             int port = randomPort();
@@ -53,7 +54,7 @@ class StartStopStatusTest {
         });
     }
 
-    @Test
+    @RetryingTest(onExceptions = {BindException.class}, maxAttempts = 10, suspendForMs = 500)
     void start() {
         assertTimeoutPreemptively(TIMEOUT, () -> {
             int port = randomPort();
@@ -67,7 +68,7 @@ class StartStopStatusTest {
         });
     }
 
-    @Test
+    @RetryingTest(onExceptions = {BindException.class}, maxAttempts = 10, suspendForMs = 500)
     void doubleStartThrows() {
         assertTimeoutPreemptively(TIMEOUT, () -> {
             int port = randomPort();
@@ -81,7 +82,7 @@ class StartStopStatusTest {
         });
     }
 
-    @Test
+    @RetryingTest(onExceptions = {BindException.class}, maxAttempts = 10, suspendForMs = 500)
     void stop() {
         assertTimeoutPreemptively(Duration.ofSeconds(2), () -> {
             int port = randomPort();
