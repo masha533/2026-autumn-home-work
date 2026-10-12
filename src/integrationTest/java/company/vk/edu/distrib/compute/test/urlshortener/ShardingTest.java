@@ -3,14 +3,13 @@ package company.vk.edu.distrib.compute.test.urlshortener;
 import company.vk.edu.distrib.compute.AbstractHttpServiceFactory;
 import company.vk.edu.distrib.compute.Dao;
 import company.vk.edu.distrib.compute.HttpService;
-import company.vk.edu.distrib.compute.iizhukov.urlshortener.api.helpers.HttpStatus;
 import company.vk.edu.distrib.compute.kv.ClusterDaoFactoryTest;
 import company.vk.edu.distrib.compute.kv.KVService;
 import company.vk.edu.distrib.compute.kv.KVServiceTest;
 import company.vk.edu.distrib.compute.kv.RemoteDaoFactory;
 import company.vk.edu.distrib.compute.urlshortener.UrlShortenerService;
 import company.vk.edu.distrib.compute.urlshortener.UrlShortenerTest;
-import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.junit.jupiter.params.Parameter;
@@ -24,9 +23,7 @@ import java.io.IOException;
 import java.net.BindException;
 import java.net.http.HttpClient;
 import java.net.http.HttpResponse;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Stream;
 
 import static company.vk.edu.distrib.compute.test.AbstractArgumentsProvider.findAnnotatedFactories;
@@ -41,13 +38,14 @@ import static org.junit.jupiter.api.Assertions.*;
 @EnabledIfEnvironmentVariable(named = "CURRENT_DATE", matches = "2026-(10-07|10-08|10-09|10-10|10-11|10-12|10-13|10-14)")
 public class ShardingTest {
     private static final int CLUSTER_SIZE = 2;
+    private static final int KEYS_COUNT = 50;
+    private static final int HTTP_OK = 200;
     public static final String TEST_LINK_ID = "10db3750xY";
-    public static final String TEST_LINK_ID_2 = "20db3750xY";
     public static final String TEST_LONG_LINK = "https://ya.ru/search/?text=test";
     public static final String TEST_LONG_LINK_2 = "https://ya.ru/search/?text=test2";
     private static final String ENTITY_PATH = "/v0/entity";
 
-    private static final HttpClient HTTP_CLIENT = HttpClient.newHttpClient();
+    private final HttpClient httpClient = HttpClient.newHttpClient();
 
     @Parameter(0)
     AbstractHttpServiceFactory<? extends UrlShortenerService> serviceFactory;
@@ -82,9 +80,9 @@ public class ShardingTest {
         service.setLinksDao(remoteDao);
     }
 
-    @AfterAll
-    public static void afterAll() {
-        HTTP_CLIENT.close();
+    @AfterEach
+    void tearDown() {
+        httpClient.close();
     }
 
     @RetryingTest(onExceptions = {BindException.class}, maxAttempts = 10, suspendForMs = 500)
@@ -93,7 +91,7 @@ public class ShardingTest {
             try {
                 startCluster();
                 service.start();
-                runHttpCtx(HTTP_CLIENT, port, () -> {
+                runHttpCtx(httpClient, port, () -> {
                     tryCreateTestUser();
 
                     String longLink = TEST_LONG_LINK;
@@ -148,26 +146,20 @@ public class ShardingTest {
     }
 
     @RetryingTest(onExceptions = {BindException.class}, maxAttempts = 10, suspendForMs = 500)
-    void shouldFollowDifferentNodes() {
+    void shouldSpreadKeysAcrossNodes() {
         assertTimeoutPreemptively(TIMEOUT, () -> {
             try {
                 startCluster();
-                remoteDao.delete(TEST_LINK_ID);
-                remoteDao.delete(TEST_LINK_ID_2);
+                Set<Integer> usedNodes = new HashSet<>();
+                for (int i = 0; i < KEYS_COUNT; i++) {
+                    String id = i + "db3750xY";
+                    assertDoesNotThrow(() -> remoteDao.upsert(id, TEST_LONG_LINK));
 
-                assertDoesNotThrow(() -> remoteDao.upsert(TEST_LINK_ID, TEST_LONG_LINK));
-                assertEquals(TEST_LONG_LINK, remoteDao.get(TEST_LINK_ID));
-
-                assertDoesNotThrow(() -> remoteDao.upsert(TEST_LINK_ID_2, TEST_LONG_LINK_2));
-                assertEquals(TEST_LONG_LINK_2, remoteDao.get(TEST_LINK_ID_2));
-
-                List<Integer> nodesOwningId = findNodesOwningId(TEST_LINK_ID);
-                assertEquals(1, nodesOwningId.size());
-
-                List<Integer> nodesOwningId2 = findNodesOwningId(TEST_LINK_ID_2);
-                assertEquals(1, nodesOwningId2.size());
-
-                assertFalse(nodesOwningId.removeAll(nodesOwningId2));
+                    List<Integer> nodesOwningId = findNodesOwningId(id);
+                    assertEquals(1, nodesOwningId.size());
+                    usedNodes.addAll(nodesOwningId);
+                }
+                assertEquals(CLUSTER_SIZE, usedNodes.size());
             } finally {
                 stopCluster();
             }
@@ -185,9 +177,9 @@ public class ShardingTest {
     private List<Integer> findNodesOwningId(String id) {
         List<Integer> idNodes = new ArrayList<>();
         for (int remotePort : remotePorts) {
-            runHttpCtx(HTTP_CLIENT, remotePort, () -> {
+            runHttpCtx(httpClient, remotePort, () -> {
                 HttpResponse<String> stringHttpResponse = get(ENTITY_PATH + "?id=" + id);
-                if (stringHttpResponse.statusCode() == HttpStatus.OK.code()) {
+                if (stringHttpResponse.statusCode() == HTTP_OK) {
                     idNodes.add(remotePort);
                 }
             });
