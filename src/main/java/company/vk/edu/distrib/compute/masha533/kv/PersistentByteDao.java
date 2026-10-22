@@ -12,6 +12,7 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.EOFException;
 import java.nio.file.StandardOpenOption;
+import java.nio.file.StandardCopyOption;
 
 public class PersistentByteDao implements Dao<byte[]> {
     private final Path file;
@@ -20,19 +21,24 @@ public class PersistentByteDao implements Dao<byte[]> {
     private static final byte DELETE = 1;
 
     private void appendOperation(byte op, String key, byte[] value) throws IOException {
-        try (var output = new DataOutputStream(
-            Files.newOutputStream(
-                file,
-                StandardOpenOption.CREATE,
-                StandardOpenOption.APPEND
-            )
-        )) {
-            output.writeByte(op);
-            output.writeUTF(key);
-            if (op == UPSERT) {
-                output.writeInt(value.length);
-                output.write(value);
+        Path path = file.toAbsolutePath();
+        Path tmp = Files.createTempFile(path.getParent(), "kv-", ".tmp");
+
+        try {
+            if (Files.exists(path)) {
+                Files.copy(path, tmp, StandardCopyOption.REPLACE_EXISTING);
             }
+            try (var output = new DataOutputStream(Files.newOutputStream(tmp, StandardOpenOption.APPEND))) {
+                output.writeByte(op);
+                output.writeUTF(key);
+                if (op == UPSERT) {
+                    output.writeInt(value.length);
+                    output.write(value);
+                }
+            }
+            Files.move(tmp, path, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+        } finally {
+            Files.deleteIfExists(tmp);
         }
     }
 
@@ -74,20 +80,20 @@ public class PersistentByteDao implements Dao<byte[]> {
     }
 
     @Override
-    public void upsert(String key, byte[] value) throws IOException {
+    public synchronized void upsert(String key, byte[] value) throws IOException {
         appendOperation(UPSERT, key, value);
         storage.put(key, value);
     }
 
     @Override
-    public void delete(String key) throws IOException {
+    public synchronized void delete(String key) throws IOException {
         appendOperation(DELETE, key, null);
         storage.remove(key);
     }
 
     @Override
-    public void close() throws IOException {
-        //
+    public synchronized void close() throws IOException {
+        storage.clear();
     }
 
 }

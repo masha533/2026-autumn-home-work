@@ -18,6 +18,8 @@ public class RemoteDao implements Dao<String> {
     private static final int HTTP_NOT_FOUND = 404;
     private static final int HTTP_CREATED = 201;
     private static final int HTTP_ACCEPTED = 202;
+    private static final String BASE_URL = "http://localhost:";
+    private static final String ENTITY_PATH = "/v0/entity?id=";
 
     public RemoteDao(int port) {
         this.port = port;
@@ -30,7 +32,7 @@ public class RemoteDao implements Dao<String> {
             throw new IllegalArgumentException();
         }
         var encodedKey = URLEncoder.encode(key, StandardCharsets.UTF_8);
-        String link = "http://localhost:" + port + "/v0/entity?id=" + encodedKey;
+        String link = BASE_URL + port + ENTITY_PATH + encodedKey;
         var request = HttpRequest.newBuilder().uri(URI.create(link)).GET().build();
         try {
             var response = client.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
@@ -53,7 +55,7 @@ public class RemoteDao implements Dao<String> {
             throw new IllegalArgumentException();
         }
         var encodedKey = URLEncoder.encode(key, StandardCharsets.UTF_8);
-        String link = "http://localhost:" + port + "/v0/entity?id=" + encodedKey;
+        String link = BASE_URL + port + ENTITY_PATH + encodedKey;
         var request = HttpRequest.newBuilder()
                 .uri(URI.create(link))
                 .PUT(HttpRequest.BodyPublishers.ofString(value, StandardCharsets.UTF_8))
@@ -75,7 +77,7 @@ public class RemoteDao implements Dao<String> {
             throw new IllegalArgumentException();
         }
         var encodedKey = URLEncoder.encode(key, StandardCharsets.UTF_8);
-        String link = "http://localhost:" + port + "/v0/entity?id=" + encodedKey;
+        String link = BASE_URL + port + ENTITY_PATH + encodedKey;
         var request = HttpRequest.newBuilder().uri(URI.create(link)).DELETE().build();
         try {
             var response = client.send(request, HttpResponse.BodyHandlers.discarding());
