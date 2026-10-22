@@ -13,12 +13,14 @@ import java.io.DataOutputStream;
 import java.io.EOFException;
 import java.nio.file.StandardOpenOption;
 import java.nio.file.StandardCopyOption;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class PersistentByteDao implements Dao<byte[]> {
     private final Path file;
     private final Map<String, byte[]> storage = new ConcurrentHashMap<>();
     private static final byte UPSERT = 0;
     private static final byte DELETE = 1;
+    private final ReentrantLock lock = new ReentrantLock();
 
     private void appendOperation(byte op, String key, byte[] value) throws IOException {
         Path path = file.toAbsolutePath();
@@ -80,20 +82,34 @@ public class PersistentByteDao implements Dao<byte[]> {
     }
 
     @Override
-    public synchronized void upsert(String key, byte[] value) throws IOException {
-        appendOperation(UPSERT, key, value);
-        storage.put(key, value);
+    public void upsert(String key, byte[] value) throws IOException {
+        lock.lock();
+        try {
+            appendOperation(UPSERT, key, value);
+            storage.put(key, value);
+        } finally {
+            lock.unlock();
+        }
     }
 
     @Override
-    public synchronized void delete(String key) throws IOException {
-        appendOperation(DELETE, key, null);
-        storage.remove(key);
+    public void delete(String key) throws IOException {
+        lock.lock();
+        try {
+            appendOperation(DELETE, key, null);
+            storage.remove(key);
+        } finally {
+            lock.unlock();
+        }
     }
 
     @Override
-    public synchronized void close() throws IOException {
-        storage.clear();
+    public void close() throws IOException {
+        lock.lock();
+        try {
+            storage.clear();
+        } finally {
+            lock.unlock();
+        }
     }
-
 }
