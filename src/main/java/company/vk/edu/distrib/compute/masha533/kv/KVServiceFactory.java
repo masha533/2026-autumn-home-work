@@ -1,5 +1,6 @@
 package company.vk.edu.distrib.compute.masha533.kv;
 
+import company.vk.edu.distrib.compute.kv.ReplicatedKVServiceTest;
 import company.vk.edu.distrib.compute.AbstractHttpServiceFactory;
 import company.vk.edu.distrib.compute.kv.KVService;
 import company.vk.edu.distrib.compute.kv.KVServiceTest;
@@ -7,6 +8,7 @@ import company.vk.edu.distrib.compute.kv.KVServiceTest;
 import java.io.IOException;
 import java.nio.file.Path;
 
+@ReplicatedKVServiceTest
 @KVServiceTest
 public class KVServiceFactory extends AbstractHttpServiceFactory<KVService> {
 
