@@ -19,6 +19,7 @@ public class ReplicationHandler {
     private final Dao<byte[]> dao;
     private final HttpClient httpClient;
     private static final int MAX_BODY_SIZE = 1024 * 1024;
+    private static final int HTTP_OK = 200;
 
     public ReplicationHandler(int port, Dao<byte[]> dao, HttpClient httpClient) {
         this.port = port;
@@ -50,7 +51,14 @@ public class ReplicationHandler {
     }
 
     private boolean isReadConfirmation(int status) {
-        return status == 200 || status == 404;
+        return status == HTTP_OK || status == 404;
+    }
+
+    private byte[] selectValue(byte[] value, ReplicaResult result) {
+        if (result.status() == HTTP_OK && value == null) {
+            return result.value();
+        }
+        return value;
     }
 
     private ReplicaResult waitForGet(
@@ -68,12 +76,10 @@ public class ReplicationHandler {
                 ReplicaResult result = results.take();
                 remaining--;
 
-                if (result.status() == 200 || result.status() == 404) {
+                if (isReadConfirmation(result.status())) {
                     confirmations++;
                 }
-                if (result.status() == 200 && value == null) {
-                    value = result.value();
-                }
+                value = selectValue(value, result);
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -86,7 +92,7 @@ public class ReplicationHandler {
         if (value == null) {
             return new ReplicaResult(404, null);
         }
-        return new ReplicaResult(200, value);
+        return new ReplicaResult(HTTP_OK, value);
     }
 
     private record ReplicaResult(int status, byte[] value) {
@@ -94,7 +100,7 @@ public class ReplicationHandler {
 
     private ReplicaResult getLocal(String id) {
         try {
-            return new ReplicaResult(200, dao.get(id));
+            return new ReplicaResult(HTTP_OK, dao.get(id));
         } catch (NoSuchElementException e) {
             return new ReplicaResult(404, null);
         } catch (IOException e) {
@@ -118,7 +124,8 @@ public class ReplicationHandler {
                     dao.upsert(id, body);
                     confirmations++;
                 } catch (IOException e) {
-                    //no
+                    System.getLogger(ReplicationHandler.class.getName())
+                            .log(System.Logger.Level.WARNING, "Local PUT failed", e);
                 }
             } else {
                 String encodedId = URLEncoder.encode(id, StandardCharsets.UTF_8);
@@ -156,7 +163,8 @@ public class ReplicationHandler {
                     dao.delete(id);
                     confirmations++;
                 } catch (IOException e) {
-                    //no
+                    System.getLogger(ReplicationHandler.class.getName())
+                            .log(System.Logger.Level.WARNING, "Local DELETE failed", e);
                 }
             } else {
                 String encodedId = URLEncoder.encode(id, StandardCharsets.UTF_8);
@@ -216,9 +224,9 @@ public class ReplicationHandler {
             }
         }
         ReplicaResult result = waitForGet(results, confirmations, remoteRequests, ack, value);
-        if (result.status() == 200) {
+        if (result.status() == HTTP_OK) {
             byte[] responseBody = result.value();
-            exchange.sendResponseHeaders(200, responseBody.length);
+            exchange.sendResponseHeaders(HTTP_OK, responseBody.length);
             exchange.getResponseBody().write(responseBody);
         } else {
             exchange.sendResponseHeaders(result.status(), -1);

@@ -21,6 +21,25 @@ public class ReplicaSelector {
         }
     }
 
+    private int findBestReplicaIndex(boolean[] selected, String key) {
+        int bestIndex = -1;
+        long bestHash = Long.MIN_VALUE;
+
+        for (int i = 0; i < ports.length; i++) {
+            if (selected[i]) {
+                continue;
+            }
+            long currentHash = hash(key, ports[i]);
+            if (bestIndex == -1
+                    || currentHash > bestHash
+                    || (currentHash == bestHash && ports[i] < ports[bestIndex])) {
+                bestIndex = i;
+                bestHash = currentHash;
+            }
+        }
+        return bestIndex;
+    }
+
     public int[] selectReplicas(String key, int count) {
         if (key == null || key.isEmpty() || count < 1 || count > ports.length) {
             throw new IllegalArgumentException();
@@ -28,21 +47,7 @@ public class ReplicaSelector {
         int[] replicas = new int[count];
         boolean[] selected = new boolean[ports.length];
         for (int replica = 0; replica < count; replica++) {
-            int bestIndex = -1;
-            long bestHash = Long.MIN_VALUE;
-
-            for (int i = 0; i < ports.length; i++) {
-                if (selected[i]) {
-                    continue;
-                }
-                long currentHash = hash(key, ports[i]);
-                if (bestIndex == -1
-                        || currentHash > bestHash
-                        || (currentHash == bestHash && ports[i] < ports[bestIndex])) {
-                    bestIndex = i;
-                    bestHash = currentHash;
-                }
-            }
+            int bestIndex = findBestReplicaIndex(selected, key);
             replicas[replica] = ports[bestIndex];
             selected[bestIndex] = true;
         }
