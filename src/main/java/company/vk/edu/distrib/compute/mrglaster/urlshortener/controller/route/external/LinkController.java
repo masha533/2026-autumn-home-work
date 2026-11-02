@@ -112,8 +112,8 @@ public class LinkController implements NetworkInteractable {
 
     public boolean isInvalidUrl(String urlString) {
         try {
-            assert !URI.create(urlString).toURL().toString().isEmpty();
-            return false;
+            String url = URI.create(urlString).toURL().toString();
+            return url.isEmpty();
         } catch (Exception e) {
             return true;
         }

@@ -19,15 +19,17 @@ public class LogWrapper implements SimpleHandler {
 
   @Override
   public Response handle(final Request request, final String content) throws IOException {
-    if (!LOG.isInfoEnabled()) {
-      return handler.handle(request, content);
-    }
-
     final int requestId = RANDOM.nextInt();
     final String method = request.getRequestMethod();
     final String path = request.getRequestURI().getPath();
     LOG.info("Got request '{} {}' (id={})", method, path, requestId);
-    final Response response = handler.handle(request, content);
+    final Response response;
+    try {
+      response = handler.handle(request, content);
+    } catch (final Exception e) {
+      LOG.error("Error while handling request", e);
+      throw e;
+    }
     final int status = response.status();
     LOG.info("Finished request with status {} (id={})", status, requestId);
     return response;

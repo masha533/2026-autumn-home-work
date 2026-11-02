@@ -50,7 +50,7 @@ public class UrlShortenerServiceImpl extends AbstractService implements UrlShort
   private static final String LINKS_BASE_PATH = "/v0/links/";
   private static final String REDIRECT_BASE_PATH = "/";
 
-  private final Dao<String> linksDao;
+  private Dao<String> linksDao;
   private final UrlShortenerAuthSystem authSystem;
   private final String host;
   private final Random random = new Random();
@@ -65,6 +65,11 @@ public class UrlShortenerServiceImpl extends AbstractService implements UrlShort
     this.authSystem = new UrlShortenerAuthSystem(usersDao);
     this.host = "http://localhost:" + port;
     init();
+  }
+
+  @Override
+  public void setLinksDao(final Dao<String> dao) {
+    this.linksDao = dao;
   }
 
   @Override

@@ -13,7 +13,7 @@ import java.util.Base64;
 // Тут бы Argon2id использовать, но пока работаем с тем, что есть
 // https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html#pbkdf2
 public final class PasswordHasher {
-    private static final int ITERATIONS = 8; // Рекомендовано 600_000, но тогда мы по таймауту в тестах вываливаемся
+    private static final int ITERATIONS = 9; // Рекомендовано 600_000, но тогда мы по таймауту в тестах вываливаемся
     private static final int KEY_LENGTH = 256;
     private static final int SALT_LENGTH = 16;
     private static final String ALGORITHM = "PBKDF2WithHmacSHA256";

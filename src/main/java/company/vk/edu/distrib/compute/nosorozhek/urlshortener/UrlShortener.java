@@ -7,9 +7,10 @@ import company.vk.edu.distrib.compute.nosorozhek.urlshortener.validation.LinkVal
 import java.io.IOException;
 import java.security.SecureRandom;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 
 public class UrlShortener {
-    private final Dao<String> urlDao;
+    private Dao<String> urlDao;
 
     public UrlShortener(Dao<String> urlDao) {
         this.urlDao = urlDao;
@@ -39,6 +40,10 @@ public class UrlShortener {
     public void delete(String id) throws IOException {
         LinkIdValidationHelper.validate(id);
         urlDao.delete(id);
+    }
+
+    void setLinksDao(Dao<String> dao) {
+        this.urlDao = Objects.requireNonNull(dao);
     }
 
     private static final class LinkIdGenerationHelper {

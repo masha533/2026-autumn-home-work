@@ -7,11 +7,13 @@ import company.vk.edu.distrib.compute.mrglaster.urlshortener.controller.route.ex
 import company.vk.edu.distrib.compute.mrglaster.urlshortener.controller.route.external.StatusController;
 import company.vk.edu.distrib.compute.mrglaster.urlshortener.controller.route.internal.UserController;
 import company.vk.edu.distrib.compute.mrglaster.urlshortener.dao.PersistentDao;
+import company.vk.edu.distrib.compute.mrglaster.urlshortener.exception.DaoCreationException;
 import company.vk.edu.distrib.compute.mrglaster.urlshortener.exception.DataSavingException;
 import company.vk.edu.distrib.compute.urlshortener.UrlShortenerService;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class EPUrlShortenerService implements UrlShortenerService {
 
@@ -21,6 +23,7 @@ public class EPUrlShortenerService implements UrlShortenerService {
 
     private final HttpServer httpServer;
     private final Dao<String> userDao;
+    private final ReentrantLock urlDaoLock = new ReentrantLock();
     private Dao<String> urlDao;
     private boolean started;
 
@@ -29,41 +32,72 @@ public class EPUrlShortenerService implements UrlShortenerService {
 
         final String baseUrl = "http://127.0.0.1:" + port;
 
-        this.urlDao = new PersistentDao<>(URL_STORAGE_FILE, PersistentDao.stringSerializer());
         this.userDao = new PersistentDao<>(USERS_STORAGE_FILE, PersistentDao.stringSerializer());
         this.started = false;
+
         AuthorizationService authService = new AuthorizationService(userDao);
 
         ControllerManager routingManager = new ControllerManager(authService);
         routingManager.addController(new StatusController());
-        routingManager.addController(new LinkController(() -> this.urlDao, baseUrl));
+        routingManager.addController(new LinkController(this::getOrCreateUrlDao, baseUrl));
         routingManager.addController(new UserController(userDao));
         routingManager.register(httpServer);
     }
 
+    private Dao<String> getOrCreateUrlDao() {
+        urlDaoLock.lock();
+        try {
+            if (urlDao == null) {
+                urlDao = new PersistentDao<>(URL_STORAGE_FILE, PersistentDao.stringSerializer());
+            }
+            return urlDao;
+        } catch (IOException e) {
+            throw new DaoCreationException(e);
+        } finally {
+            urlDaoLock.unlock();
+        }
+    }
+
     @Override
     public void start() {
+        getOrCreateUrlDao();
         started = true;
         httpServer.start();
     }
 
     @Override
     public void stop() {
+        urlDaoLock.lock();
         try {
             userDao.close();
-            urlDao.close();
+            if (urlDao != null) {
+                urlDao.close();
+            }
         } catch (Exception e) {
             throw new DataSavingException("Unable to save data to files", e);
         } finally {
+            urlDaoLock.unlock();
             httpServer.stop(SHUTDOWN_DELAY);
         }
     }
 
     @Override
     public void setLinksDao(Dao<String> urlDao) {
-        if (started) {
-            throw new IllegalStateException("Links storage can only be set before start");
+        urlDaoLock.lock();
+        try {
+            if (started) {
+                throw new IllegalStateException("Links storage can only be set before start");
+            }
+            if (this.urlDao != null) {
+                try {
+                    this.urlDao.close();
+                } catch (Exception e) {
+                    throw new DataSavingException("Unable to close previous links storage", e);
+                }
+            }
+            this.urlDao = urlDao;
+        } finally {
+            urlDaoLock.unlock();
         }
-        this.urlDao = urlDao;
     }
 }

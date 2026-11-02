@@ -10,7 +10,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.net.InetSocketAddress;
+import java.util.Objects;
 
 public class UrlShortenerServiceImpl implements UrlShortenerService {
     private static final Logger log = LoggerFactory.getLogger(UrlShortenerServiceImpl.class);
@@ -20,9 +22,9 @@ public class UrlShortenerServiceImpl implements UrlShortenerService {
     private final UrlShortener urlShortener;
     private final UserService userService;
     private final AuthenticationMiddleware auth;
-
-    private final Dao<String> urlDao;
     private final Dao<String> userDao;
+    private Dao<String> urlDao;
+    private boolean startedOrStopped;
 
     public UrlShortenerServiceImpl(Dao<String> urlDao, Dao<String> userDao, int port) throws IOException {
         this.urlDao = urlDao;
@@ -46,13 +48,33 @@ public class UrlShortenerServiceImpl implements UrlShortenerService {
     }
 
     @Override
+    public void setLinksDao(Dao<String> dao) {
+        if (startedOrStopped) {
+            throw new IllegalStateException("Links DAO must be set before start");
+        }
+        Dao<String> replacement = Objects.requireNonNull(dao);
+        if (urlDao == replacement) {
+            return;
+        }
+        try {
+            urlDao.close();
+        } catch (IOException e) {
+            throw new UncheckedIOException("Failed to close previous links DAO", e);
+        }
+        urlShortener.setLinksDao(replacement);
+        urlDao = replacement;
+    }
+
+    @Override
     public void start() {
+        startedOrStopped = true;
         log.info("Started");
         server.start();
     }
 
     @Override
     public void stop() {
+        startedOrStopped = true;
         log.info("Stopping");
         server.stop(0);
 

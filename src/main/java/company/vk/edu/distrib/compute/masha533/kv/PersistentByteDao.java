@@ -12,27 +12,35 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.EOFException;
 import java.nio.file.StandardOpenOption;
+import java.nio.file.StandardCopyOption;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class PersistentByteDao implements Dao<byte[]> {
     private final Path file;
     private final Map<String, byte[]> storage = new ConcurrentHashMap<>();
     private static final byte UPSERT = 0;
     private static final byte DELETE = 1;
+    private final ReentrantLock lock = new ReentrantLock();
 
     private void appendOperation(byte op, String key, byte[] value) throws IOException {
-        try (var output = new DataOutputStream(
-            Files.newOutputStream(
-                file,
-                StandardOpenOption.CREATE,
-                StandardOpenOption.APPEND
-            )
-        )) {
-            output.writeByte(op);
-            output.writeUTF(key);
-            if (op == UPSERT) {
-                output.writeInt(value.length);
-                output.write(value);
+        Path path = file.toAbsolutePath();
+        Path tmp = Files.createTempFile(path.getParent(), "kv-", ".tmp");
+
+        try {
+            if (Files.exists(path)) {
+                Files.copy(path, tmp, StandardCopyOption.REPLACE_EXISTING);
             }
+            try (var output = new DataOutputStream(Files.newOutputStream(tmp, StandardOpenOption.APPEND))) {
+                output.writeByte(op);
+                output.writeUTF(key);
+                if (op == UPSERT) {
+                    output.writeInt(value.length);
+                    output.write(value);
+                }
+            }
+            Files.move(tmp, path, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+        } finally {
+            Files.deleteIfExists(tmp);
         }
     }
 
@@ -75,19 +83,33 @@ public class PersistentByteDao implements Dao<byte[]> {
 
     @Override
     public void upsert(String key, byte[] value) throws IOException {
-        appendOperation(UPSERT, key, value);
-        storage.put(key, value);
+        lock.lock();
+        try {
+            appendOperation(UPSERT, key, value);
+            storage.put(key, value);
+        } finally {
+            lock.unlock();
+        }
     }
 
     @Override
     public void delete(String key) throws IOException {
-        appendOperation(DELETE, key, null);
-        storage.remove(key);
+        lock.lock();
+        try {
+            appendOperation(DELETE, key, null);
+            storage.remove(key);
+        } finally {
+            lock.unlock();
+        }
     }
 
     @Override
     public void close() throws IOException {
-        //
+        lock.lock();
+        try {
+            storage.clear();
+        } finally {
+            lock.unlock();
+        }
     }
-
 }

@@ -22,6 +22,7 @@ public class KVServiceImpl implements KVService {
     private static final int PARTS_COUNT = 2;
     private static final String ID_PARAMETER = "id";
     private final ExecutorService executor;
+    private static final int MAX_BODY_SIZE = 1024 * 1024;
 
     private String extractId(String query) {
         if (query == null) {
@@ -67,7 +68,12 @@ public class KVServiceImpl implements KVService {
                 exchange.close();
             }
         } else if (PUT_METHOD.equals(method)) {
-            byte[] body = exchange.getRequestBody().readAllBytes();
+            byte[] body = exchange.getRequestBody().readNBytes(MAX_BODY_SIZE + 1);
+            if (body.length > MAX_BODY_SIZE) {
+                exchange.sendResponseHeaders(413, -1);
+                exchange.close();
+                return;
+            }
             dao.upsert(id, body);
             exchange.sendResponseHeaders(201, -1);
             exchange.close();

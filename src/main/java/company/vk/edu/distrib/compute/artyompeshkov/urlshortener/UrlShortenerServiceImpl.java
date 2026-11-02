@@ -10,24 +10,34 @@ import company.vk.edu.distrib.compute.urlshortener.UrlShortenerService;
 
 public class UrlShortenerServiceImpl implements UrlShortenerService {
     private final int port;
-    private final Dao<String> links;
     private final Dao<String> users;
     private final HttpServer server;
+    private Dao<String> links;
+    private boolean started;
 
     public UrlShortenerServiceImpl(int port, Dao<String> links, Dao<String> users) throws IOException {
         this.port = port;
         this.links = links;
         this.users = users;
         this.server = HttpServer.create();
+    }
+
+    @Override
+    public void setLinksDao(Dao<String> dao) {
+        if (started) {
+            throw new IllegalStateException("Links storage can only be set before start");
+        }
+        links = dao;
+    }
+
+    @Override
+    public void start() {
+        started = true;
         String baseUrl = "http://localhost:" + port + "/";
         server.createContext(StatusHandler.PATH, new StatusHandler());
         server.createContext(LinksHandler.PATH, new LinksHandler(links, new SimpleAuth(users), baseUrl));
         server.createContext(UsersHandler.PATH, new UsersHandler(users));
         server.createContext(RedirectHandler.PATH, new RedirectHandler(links));
-    }
-
-    @Override
-    public void start() {
         try {
             server.bind(new InetSocketAddress(port), 0);
         } catch (IOException e) {
